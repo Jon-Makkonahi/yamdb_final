@@ -21,6 +21,7 @@ jobs:
 
     - name: Install dependencies
       run: | 
+        cd api_yamdb/
         # обновление pip
         python -m pip install --upgrade pip 
         # установка flake8 и его плагинов
