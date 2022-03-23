@@ -1,4 +1,4 @@
-# Учебный проект "YaMDb API"
+# Учебный проект "YaMDb API" ![example workflow](https://github.com/Jon-Makkonahi/yamdb_final/actions/workflows/yamdb_workflow.yml/badge.svg)
 
 Проект YaMDb позволяет добавлять новых пользователей,
 собирает отзывы пользователей на различные произведения.
@@ -93,4 +93,3 @@ sudo docker-compose exec web python manage.py collectstatic --no-input
 ```
 sudo docker-compose down -v
 ```
-![example workflow](https://github.com/Jon-Makkonahi/yamdb_final/actions/workflows/yamdb_workflow.yml/badge.svg)
