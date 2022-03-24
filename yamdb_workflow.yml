@@ -36,6 +36,7 @@ jobs:
     name: Push Docker image to Docker Hub
     runs-on: ubuntu-latest
     needs: tests
+    if: github.ref == 'refs/heads/master'
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2 
@@ -69,6 +70,8 @@ jobs:
             sudo docker-compose stop
             sudo docker-compose rm web
             touch .env
+            echo SECRET_KEY=${{ secrets.SECRET_KEY }} >> .env
+            echo HOST=${{ secrets.HOST }} >> .env
             echo DB_ENGINE=${{ secrets.DB_ENGINE }} >> .env
             echo DB_NAME=${{ secrets.DB_NAME }} >> .env
             echo POSTGRES_USER=${{ secrets.POSTGRES_USER }} >> .env
@@ -80,7 +83,6 @@ jobs:
   send_message:
     runs-on: ubuntu-latest
     needs: deploy
-    if: github.ref == 'refs/heads/master'
     steps:
       - name: send message
         uses: appleboy/telegram-action@master
