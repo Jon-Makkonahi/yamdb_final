@@ -1,7 +1,7 @@
 import os
 from datetime import timedelta
-from django.utils import timezone
 
+from django.utils import timezone
 from dotenv import load_dotenv
 
 load_dotenv()
