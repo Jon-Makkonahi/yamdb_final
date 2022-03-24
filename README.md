@@ -90,3 +90,7 @@ sudo docker-compose exec web python manage.py collectstatic --no-input
 ```bash
 sudo docker-compose down -v
 ```
+Ссылка на проект
+```
+http://51.250.64.58/
+```
