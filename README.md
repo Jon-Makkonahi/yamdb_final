@@ -17,9 +17,6 @@
 
 ```
 git clone git@github.com:Jon-Makkonahi/yamdb_final.git
-```
-
-```
 cd api_yambd
 ```
 
