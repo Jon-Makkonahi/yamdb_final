@@ -1,7 +1,6 @@
 import os
 from datetime import timedelta
 
-from django.utils import timezone
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -90,7 +89,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'ru-RU'
 
-TIME_ZONE = timezone.now()
+TIME_ZONE = 'Europe/Moscow'
 
 USE_I18N = True
 
