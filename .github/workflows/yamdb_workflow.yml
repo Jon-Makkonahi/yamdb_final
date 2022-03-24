@@ -19,11 +19,8 @@ jobs:
     - name: Install dependencies
       run: | 
         cd api_yamdb/
-        # обновление pip
-        python -m pip install --upgrade pip 
-        # установка flake8 и его плагинов
+        python -m pip install --upgrade pip
         pip install flake8 pep8-naming flake8-broken-line flake8-return flake8-isort
-        # установка зависимостей
         pip install -r requirements.txt 
     - name: Test with flake8 and django tests
       run: |
@@ -71,6 +68,7 @@ jobs:
             sudo docker-compose rm web
             touch .env
             echo SECRET_KEY=${{ secrets.SECRET_KEY }} >> .env
+            echo ALLOWED_HOSTS=${{ secrits.ALLOWED_HOSTS }} >> .env
             echo HOST=${{ secrets.HOST }} >> .env
             echo DB_ENGINE=${{ secrets.DB_ENGINE }} >> .env
             echo DB_NAME=${{ secrets.DB_NAME }} >> .env
