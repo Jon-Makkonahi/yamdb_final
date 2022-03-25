@@ -9,7 +9,7 @@ services:
       - ./.env
   
   web:
-    image: jonmakko/api_yamdb:v4.24.2022
+    image: jonmakko/api_yamdb:v4.25.2022
     restart: always
     depends_on:
       - postgres
