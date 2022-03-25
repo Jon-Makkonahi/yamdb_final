@@ -7,7 +7,6 @@ services:
       - postgres_data:/var/lib/postgresql/data/
     env_file:
       - ./.env
-  
   web:
     image: jonmakko/api_yamdb:v4.24.2022
     restart: always
@@ -27,7 +26,6 @@ services:
       - media_value:/var/html/media/
     depends_on:
       - web
-
 volumes:
   postgres_data:
   static_value:
