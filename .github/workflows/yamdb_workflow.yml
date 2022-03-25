@@ -49,7 +49,7 @@ jobs:
         with:
           context: ./api_yamdb
           push: true
-          tags: jonmakko/api_yamdb:v4.23.2022
+          tags: jonmakko/api_yamdb:v4.24.2022
 
   deploy:
     runs-on: ubuntu-latest
