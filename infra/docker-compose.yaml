@@ -1,24 +1,27 @@
 version: '3.3'
 
 services:
-  postgres:
-    image: postgres:13.1
+  db:
+    image: postgres:13.0-alpine
     volumes:
-      - postgres_data:/var/lib/postgresql/data/
+      - /var/lib/postgresql/data/
+      - ./postgres/db_init.sh:/docker-entrypoint-initdb.d/db_init.sh
     env_file:
-      - ./.env
-  
+      - .env
   web:
     image: jonmakko/api_yamdb:v4.23.2022
     restart: always
+    volumes:
+      - static_value:/app/static/
+      - media_value:/app/media/
+    ports:
+     - "8000:8000"
     depends_on:
-      - postgres
+      - db
     env_file:
-      - ./.env
-  
+      - .env
   nginx:
     image: nginx:1.21.3-alpine
-    restart: always
     ports:
       - "80:80"
     volumes:
@@ -27,8 +30,5 @@ services:
       - media_value:/var/html/media/
     depends_on:
       - web
-
 volumes:
-  postgres_data:
   static_value:
-  media_value:
