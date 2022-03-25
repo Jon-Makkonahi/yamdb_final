@@ -1,21 +1,25 @@
 version: '3.3'
 
+volumes:
+  postgres_data:
+  static_value:
+  media_value:
+
 services:
-  postgres:
+  db:
     image: postgres:13.1
+    restart: always
     volumes:
       - postgres_data:/var/lib/postgresql/data/
     env_file:
       - ./.env
-  
   web:
     image: jonmakko/api_yamdb:v4.24.2022
     restart: always
     depends_on:
-      - postgres
+      - db
     env_file:
       - ./.env
-  
   nginx:
     image: nginx:1.21.3-alpine
     restart: always
@@ -27,8 +31,3 @@ services:
       - media_value:/var/html/media/
     depends_on:
       - web
-
-volumes:
-  postgres_data:
-  static_value:
-  media_value:
