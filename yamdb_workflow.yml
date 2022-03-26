@@ -19,7 +19,7 @@ jobs:
     - name: Install dependencies
       run: | 
         cd api_yamdb/
-        python -m pip install --upgrade pip 
+        python -m pip install --upgrade pip
         pip install flake8 pep8-naming flake8-broken-line flake8-return flake8-isort
         pip install -r requirements.txt 
     - name: Test with flake8 and django tests
@@ -27,7 +27,6 @@ jobs:
         # запуск проверки проекта по flake8
         python -m flake8
         pytest
-
 
   build_and_push_to_docker_hub:
     name: Push Docker image to Docker Hub
@@ -69,7 +68,6 @@ jobs:
             touch .env
             echo SECRET_KEY=${{ secrets.SECRET_KEY }} >> .env
             echo ALLOWED_HOSTS=${{ secrets.ALLOWED_HOSTS }} >> .env
-            echo HOST=${{ secrets.HOST }} >> .env
             echo DB_ENGINE=${{ secrets.DB_ENGINE }} >> .env
             echo DB_NAME=${{ secrets.DB_NAME }} >> .env
             echo POSTGRES_USER=${{ secrets.POSTGRES_USER }} >> .env
@@ -77,6 +75,7 @@ jobs:
             echo DB_HOST=${{ secrets.DB_HOST }} >> .env
             echo DB_PORT=${{ secrets.DB_PORT }} >> .env
             sudo docker-compose up -d
+            sudo docker-compose exec -T web python manage.py collectstatic --no-input
     
   send_message:
     runs-on: ubuntu-latest
