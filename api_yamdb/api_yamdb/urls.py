@@ -11,8 +11,8 @@ schema_view = get_schema_view(
       description="Документация  проекта api_yamdb",
       contact=openapi.Contact(email="admin@api_yamdb.ru"),
       license=openapi.License(name="BSD License"),
-   ),
-   public=True,
+    ),
+    public=True,
 )
 
 urlpatterns = [
