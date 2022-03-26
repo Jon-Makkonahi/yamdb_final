@@ -1,97 +1,28 @@
-from django.conf import settings
-from django.contrib.auth.models import BaseUserManager
-from django.core.mail import BadHeaderError, send_mail
+from django.core.mail import EmailMessage
 from django.db.models import Avg
 from django.shortcuts import get_object_or_404
-from django_filters import rest_framework as fl
-from rest_framework import filters, mixins, status, viewsets
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import (SAFE_METHODS, AllowAny,
-                                        IsAuthenticated,
-                                        IsAuthenticatedOrReadOnly)
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import filters, permissions, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.pagination import (LimitOffsetPagination,
+                                       PageNumberPagination)
 from rest_framework.response import Response
-from rest_framework.serializers import ValidationError
-from rest_framework_simplejwt.tokens import RefreshToken
-from reviews.models import Category, Genre, Review, Title, User
+from rest_framework_simplejwt.settings import api_settings
+from reviews.models import ADMIN, Category, Genre, Review, Title, User
 
 from .filters import TitleFilter
-from .permissions import (IsAdmin, IsAdminOrReadOnly,
-                          IsAuthorOrReadOnlyOrModeratorOrAdmin)
+from .mixins import CreateListDeleteViewSet
+from .permissions import IsAdmin, IsAdminOrReadOnly, IsAuthorOrModerOrReadOnly
 from .serializers import (CategorySerializer, CommentSerializer,
-                          ConfirmationCodeSerializer, GenreSerializer,
-                          ReadTitleSerializer, ReviewSerializer,
-                          TitleSerializer, UsernameEmailSerializer,
-                          UserSerializer)
+                          ConfirmationSerializer, GenreSerializer,
+                          ReviewSerializer, SignupSerializer,
+                          TitlePostSerializer, TitleSerializer, UserSerializer)
+from .tokens import account_activation_token
 
-ACTIVATE = 'Активируйте свой аккаунт.'
-CONFIRMATION_CODE = (
-    'Ваш код подтверждения: {confirmation_code}\n'
-    'Передайте эндпоинту http://127.0.0.1:8000/api/v1/auth/token/\n'
-    'свои "username" и "confirmation_code" для получения токена'
-)
-USERNAME_ALREADY_EXISTS = 'Пользователь с таким username уже существует!'
-EMAIL_ALREADY_EXISTS = 'Пользователь с таким email уже существует!'
-
-
-@api_view(['POST'])
-@permission_classes((AllowAny,))
-def create_user(request):
-    serializer = UsernameEmailSerializer(data=request.data)
-    serializer.is_valid(raise_exception=True)
-    username = serializer.validated_data.get('username')
-    email = serializer.validated_data.get('email').lower()
-    try:
-        user = User.objects.get(username=username, email=email)
-    except User.DoesNotExist:
-        if User.objects.filter(username=username).exists():
-            raise ValidationError(USERNAME_ALREADY_EXISTS)
-        if User.objects.filter(email=email).exists():
-            raise ValidationError(EMAIL_ALREADY_EXISTS)
-        user = User.objects.create_user(username=username, email=email)
-    user.set_password(BaseUserManager().make_random_password())
-    user.save()
-    confirmation_code = user.password
-    try:
-        send_mail(
-            subject=ACTIVATE, recipient_list=[email],
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            message=CONFIRMATION_CODE.format(
-                confirmation_code=confirmation_code,
-            ),
-            fail_silently=False
-        )
-    except BadHeaderError as error:
-        raise BadHeaderError(f'Email не был отправлен: { error }')
-    return Response(serializer.data, status=status.HTTP_200_OK)
-
-
-@api_view(['POST'])
-@permission_classes((AllowAny,))
-def create_token(request):
-    serializer = ConfirmationCodeSerializer(data=request.data)
-    serializer.is_valid(raise_exception=True)
-    username = serializer.validated_data.get('username')
-    if not User.objects.filter(username=username).exists():
-        return Response(status=status.HTTP_404_NOT_FOUND)
-    user = User.objects.get(username=username)
-    confirmation_code = serializer.validated_data.get('confirmation_code')
-    if user.password == confirmation_code:
-        token = str(RefreshToken.for_user(user).access_token)
-        return Response(data={"token": token}, status=status.HTTP_200_OK)
-    return Response(status=status.HTTP_400_BAD_REQUEST)
-
-
-@api_view(['GET', 'PATCH'])
-@permission_classes((IsAuthenticated,))
-def self_user(request):
-    if request.method == 'GET':
-        user = get_object_or_404(User, username=request.user.username)
-        serializer = UserSerializer(user)
-        return Response(serializer.data)
-    serializer = UserSerializer(request.user, data=request.data, partial=True)
-    serializer.is_valid(raise_exception=True)
-    serializer.save(role=request.user.role)
-    return Response(serializer.data)
+CORRECT_CODE = 'Код регистрации аккаунта'
+WRONG_CODE = 'Неверный код активации'
+USERNAME_ALREADY_EXISTS = 'Такой username уже существует'
+EMAIL_ALREADY_EXTST = 'Такой email уже существует'
 
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -99,66 +30,180 @@ class UserViewSet(viewsets.ModelViewSet):
     filter_backends = (filters.SearchFilter,)
     search_fields = ('username',)
     serializer_class = UserSerializer
-    permission_classes = (IsAdmin,)
+    permission_classes = (permissions.IsAuthenticated, IsAdmin,)
     lookup_field = 'username'
+    pagination_class = LimitOffsetPagination
+
+    @action(
+        methods=['get', 'patch'],
+        detail=False,
+        url_path='me',
+        permission_classes=(permissions.IsAuthenticated,)
+    )
+    def users_profile(self, request):
+        user = get_object_or_404(
+            User,
+            username=request.user.username)
+
+        if request.method != 'PATCH':
+            serializer = self.get_serializer(user)
+            return Response(serializer.data)
+        serializer = UserSerializer(
+            user,
+            context={'request': request},
+            data=request.data,
+            partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        if self.request.user.role == ADMIN or self.request.user.is_superuser:
+            serializer.save()
+        else:
+            serializer.save(role=user.role)
+        return Response(
+            serializer.data,
+            status=status.HTTP_200_OK)
 
 
-class TitleViewSet(viewsets.ModelViewSet):
-    queryset = Title.objects.annotate(rating=Avg('reviews__score'))
-    permission_classes = (IsAdminOrReadOnly,)
-    filter_backends = (fl.DjangoFilterBackend,)
-    filterset_class = TitleFilter
+class CreateUserViewSet(viewsets.ModelViewSet):
+    queryset = User.objects.all()
+    permission_classes = (permissions.AllowAny,)
 
-    def get_serializer_class(self):
-        if self.request.method not in SAFE_METHODS:
-            return TitleSerializer
-        return ReadTitleSerializer
+    def create(self, request):
+        serializer = SignupSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        username = serializer.validated_data.get('username')
+        email = serializer.validated_data.get('email').lower()
+        try:
+            user = User.objects.get(
+                username=username,
+                email=email)
+        except User.DoesNotExist:
+            if User.objects.filter(username=username).exists():
+                return Response(
+                    USERNAME_ALREADY_EXISTS,
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            if User.objects.filter(email=email).exists():
+                return Response(
+                    EMAIL_ALREADY_EXTST,
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            user = User.objects.create_user(username=username, email=email)
+        user.is_active = False
+        user.save()
+        message = account_activation_token.make_token(user)
+        email = EmailMessage(
+            CORRECT_CODE,
+            message,
+            to=[serializer.validated_data.get('email')]
+        )
+    # мейл-адрес находится в переменной EMAIL_HOST_USER файла settings.py
+        email.send()
+        return Response(
+            serializer.data,
+            status=status.HTTP_200_OK
+        )
 
 
-class MixinViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
-                   mixins.DestroyModelMixin,
-                   viewsets.GenericViewSet):
+class UserValidationViewSet(viewsets.ModelViewSet):
+    queryset = User.objects.all()
+    permission_classes = (permissions.AllowAny,)
+
+    def create(self, request):
+        serializer = ConfirmationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = get_object_or_404(
+            User,
+            username=serializer.validated_data.get('username'))
+        confirmation_code = serializer.validated_data.get('confirmation_code')
+        if (not account_activation_token.check_token(
+                user,
+                confirmation_code)):
+            return Response(
+                WRONG_CODE,
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        user.is_active = True
+        user.save()
+        jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
+        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
+
+        payload = jwt_payload_handler(request.user)
+        token = jwt_encode_handler(payload)
+        return Response(
+            {
+                'token': token
+            },
+            status=status.HTTP_200_OK
+        )
+
+
+class CategoryGenreViewSet(CreateListDeleteViewSet):
     permission_classes = (IsAdminOrReadOnly,)
     filter_backends = (filters.SearchFilter,)
     search_fields = ('name',)
     lookup_field = 'slug'
 
 
-class GenreViewSet(MixinViewSet):
-    queryset = Genre.objects.all()
-    serializer_class = GenreSerializer
-
-
-class CategoryViewSet(MixinViewSet):
+class CategoryViewSet(CategoryGenreViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
 
 
-class CommentViewSet(viewsets.ModelViewSet):
-    serializer_class = CommentSerializer
-    permission_classes = (
-        IsAuthenticatedOrReadOnly, IsAuthorOrReadOnlyOrModeratorOrAdmin
-    )
+class GenreViewSet(CategoryGenreViewSet):
+    queryset = Genre.objects.all()
+    serializer_class = GenreSerializer
 
-    def get_queryset(self):
-        review = get_object_or_404(Review, id=self.kwargs.get('review_id'))
-        return review.comments.all()
+
+class TitlesViewSet(viewsets.ModelViewSet):
+    queryset = Title.objects.all().annotate(rating=Avg('reviews__score'))
+    pagination_class = PageNumberPagination
+    ordering = ['name']
+
+    permission_classes = (IsAdminOrReadOnly,)
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter,
+                       filters.OrderingFilter)
+    filterset_class = TitleFilter
+
+    def get_serializer_class(self):
+        if self.request.method == 'GET':
+            return TitleSerializer
+        return TitlePostSerializer
+
+
+class ReviewsViewSet(viewsets.ModelViewSet):
+    serializer_class = ReviewSerializer
+    pagination_class = LimitOffsetPagination
+    permission_classes = (IsAuthorOrModerOrReadOnly,
+                          permissions.IsAuthenticatedOrReadOnly)
+
+    def _get_title(self):
+        return get_object_or_404(Title, id=self.kwargs.get('title_id'))
 
     def perform_create(self, serializer):
-        review = get_object_or_404(Review, id=self.kwargs.get('review_id'))
-        serializer.save(author=self.request.user, review=review)
-
-
-class ReviewViewSet(viewsets.ModelViewSet):
-    serializer_class = ReviewSerializer
-    permission_classes = (
-        IsAuthenticatedOrReadOnly, IsAuthorOrReadOnlyOrModeratorOrAdmin
-    )
+        title = self._get_title()
+        serializer.save(author=self.request.user, title=title)
 
     def get_queryset(self):
-        title = get_object_or_404(Title, id=self.kwargs.get('title_id'))
+        title = self._get_title()
         return title.reviews.all()
 
+
+class CommentsViewSet(viewsets.ModelViewSet):
+    queryset = Review.objects.all()
+    serializer_class = CommentSerializer
+    pagination_class = LimitOffsetPagination
+    permission_classes = (
+        IsAuthorOrModerOrReadOnly, permissions.IsAuthenticatedOrReadOnly
+    )
+
+    def _get_review(self):
+        return get_object_or_404(Review, id=self.kwargs.get('review_id'))
+
     def perform_create(self, serializer):
-        title = get_object_or_404(Title, id=self.kwargs.get('title_id'))
-        serializer.save(author=self.request.user, title=title)
+        review = self._get_review()
+        serializer.save(author=self.request.user, review=review)
+
+    def get_queryset(self):
+        review = self._get_review()
+        return review.comments.all()
