@@ -6,11 +6,11 @@ from drf_yasg.views import get_schema_view
 
 schema_view = get_schema_view(
     openapi.Info(
-      title="Api_yamdb API",
-      default_version='v1',
-      description="Документация  проекта api_yamdb",
-      contact=openapi.Contact(email="admin@api_yamdb.ru"),
-      license=openapi.License(name="BSD License"),
+        title="Api_yamdb API",
+        default_version='v1',
+        description="Документация  проекта api_yamdb",
+        contact=openapi.Contact(email="admin@api_yamdb.ru"),
+        license=openapi.License(name="BSD License"),
     ),
     public=True,
 )
