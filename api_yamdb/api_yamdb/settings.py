@@ -132,13 +132,3 @@ EMAIL_HOST_PASSWORD = 'yourpassword'
 EMAIL_PORT = 587
 
 PASSWORD_RESET_TIMEOUT = 60 * 60 * 24 * 3
-
-SWAGGER_SETTINGS = {
-    'SECURITY_DEFINITIONS': {
-        'Bearer': {
-            'type': 'apiKey',
-            'name': 'Authorization',
-            'in': 'header'
-        }
-    }
-}
